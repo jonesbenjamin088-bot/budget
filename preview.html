@@ -161,6 +161,28 @@ body{touch-action:manipulation} /* prevents double-tap zoom; no size change */
   .tab-item.active{color:var(--accent)}
   .tab-item svg{width:22px;height:22px}
 }
+
+/* ===== Stage B dashboard ===== */
+.db-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
+.db-greet{font-size:20px;font-weight:600;letter-spacing:-.4px}
+.db-av{width:38px;height:38px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:16px;flex-shrink:0}
+.db-hero{margin-bottom:16px}
+.db-eyebrow,.db-cardeyebrow{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-soft);font-weight:600}
+.db-cardeyebrow{display:block;margin-bottom:12px}
+.db-num{font-size:44px;font-weight:700;letter-spacing:-2px;margin:3px 0 2px}
+.db-sub{font-size:13px;font-weight:500;margin-bottom:8px}
+.db-spark{display:block;width:100%;height:54px}
+.db-chips{display:flex;gap:10px;margin-bottom:16px}
+.db-chip{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px}
+.db-chipl{font-size:11px;color:var(--text-soft)}
+.db-chipv{font-size:16px;font-weight:600;margin-top:4px}
+.db-prog{margin-bottom:13px}
+.db-prog:last-child{margin-bottom:0}
+.db-progtop{display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:7px}
+.db-track{height:4px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.db-fill{height:100%;border-radius:99px}
+.db-total{display:flex;justify-content:space-between;align-items:center;background:#0e0e10;border-radius:11px;margin:12px -7px -6px;padding:11px 13px;font-weight:600;font-size:14px}
+.db-total span:last-child{font-weight:700}
 </style>
 </head>
 <body>
@@ -422,6 +444,16 @@ function monthTabsHTML(active,fn){
 }
 /* ============ Dashboard ============ */
 function setDashMonth(i){dashMonth=i;navigate();}
+function sparklineSVG(series){
+  var w=300,h=54,n=series.length;
+  var mn=Math.min.apply(null,series.concat([0])),mx=Math.max.apply(null,series.concat([0]));
+  var span=(mx-mn)||1;
+  var pts=series.map(function(v,i){var x=n>1?(i/(n-1))*w:0;var y=h-4-((v-mn)/span)*(h-8);return [x,y];});
+  var line=pts.map(function(pt,i){return (i?"L":"M")+pt[0].toFixed(1)+","+pt[1].toFixed(1);}).join(" ");
+  var area=line+" L"+w+","+h+" L0,"+h+" Z";
+  return '<svg class="db-spark" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none"><defs><linearGradient id="spk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6366f1" stop-opacity="0.32"/><stop offset="1" stop-color="#6366f1" stop-opacity="0"/></linearGradient></defs><path d="'+area+'" fill="url(#spk)"/><path d="'+line+'" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+}
+function setName(v){appData.settings.name=(v||"").trim();saveData();navigate();}
 function renderDashboard(host){
   const a=appData.assets, m=dashMonth;
   const pend=pendingCharges(m), tc=totalCash(m), stocks=holdingsValue();
@@ -429,76 +461,96 @@ function renderDashboard(host){
   const debtPmt=debts.reduce((s,d)=>s+d.payment,0), debtBal=debts.reduce((s,d)=>s+d.balance,0);
   const subTotal=subs.reduce((s,x)=>s+x.amount,0);
   const assetRow=(key,label)=>`<div class="kv"><span class="lbl">${label}</span><input class="inline-num" value="${a[key]}" onchange="setAsset('${key}',this.value)"></div>`;
-
+  const netWorth=a.checking+a.savings+a.other+a.cece529-a.cardBalance+stocks-debtBal;
+  const incomeM=totalActualIncome(m);
+  const spentM=expenseCats().reduce((s,c)=>s+actual(c.id,m),0);
+  const remM=incomeM-spentM;
+  const series=MONTHS.map((_,i)=>totalActualIncome(i)-expenseCats().reduce((s,c)=>s+actual(c.id,i),0));
+  const hr=new Date().getHours();
+  const tod=hr<12?"morning":(hr<18?"afternoon":"evening");
+  const nm=(appData.settings&&appData.settings.name)?appData.settings.name:"";
+  const av=(nm||(typeof session!=="undefined"&&session&&session.user&&session.user.email)||"U").trim().charAt(0).toUpperCase();
+  const spendCats=expenseCats().map(c=>({name:c.name,spent:actual(c.id,m),budget:budgetOf(c.id,m)})).filter(x=>x.spent>0||x.budget>0).sort((x,y)=>y.spent-x.spent);
+  const remCol=remM<0?"var(--red)":"var(--green)";
   host.innerHTML=`
-  <div class="page-head">
-    <div><h1 class="page-title">Dashboard</h1><div class="page-sub">${MONTHS[m]} ${appData.year}</div></div>
-    <div class="head-actions">${monthTabsHTML(m,"setDashMonth")}</div>
+  <div class="db-head">
+    <div><div class="db-greet">Good ${tod}${nm?(", "+escapeHTML(nm)):""}</div><div class="page-sub">${MONTHS[m]} ${appData.year}</div></div>
+    <div class="db-av">${av}</div>
   </div>
-  <div class="grid grid-3">
-    <div class="card">
-      <h3>Total Assets</h3>
-      ${assetRow("checking","Checking")}
-      ${assetRow("savings","Savings")}
-      ${assetRow("cardBalance","Card Balance")}
-      <div class="kv"><span class="lbl">Pending Charges</span><span class="val ${fmtCls(pend)}">${fmt(pend)}</span></div>
-      <div class="kv rule big"><span class="lbl">Total Cash</span><span class="val ${fmtCls(tc)}">${fmt(tc)}</span></div>
-      <div class="kv"><span class="lbl">Stocks</span><span class="val">${fmt(stocks)}</span></div>
-      <div class="kv rule big"><span class="lbl">Cash + Stocks</span><span class="val ${fmtCls(tc+stocks)}">${fmt(tc+stocks)}</span></div>
-      ${assetRow("other","Other")}
-      ${assetRow("cece529","Cece 529")}
-      <div class="muted" style="margin-top:8px">Blue values are inputs — click to edit. Pending = ${MONTHS[m]} transactions with note “Pending”.</div>
+  <div class="head-actions" style="margin-bottom:16px">${monthTabsHTML(m,"setDashMonth")}</div>
+  <div class="db-hero">
+    <div class="db-eyebrow">Net worth</div>
+    <div class="db-num">${fmt(netWorth)}</div>
+    <div class="db-sub" style="color:${remCol}">${remM>=0?"▲":"▼"} ${fmt(Math.abs(remM))} in ${MONTHS[m]}</div>
+    ${sparklineSVG(series)}
+  </div>
+  <div class="db-chips">
+    <div class="db-chip"><div class="db-chipl">Income</div><div class="db-chipv" style="color:var(--green)">${incomeM>0?"+":""}${fmt(incomeM)}</div></div>
+    <div class="db-chip"><div class="db-chipl">Spent</div><div class="db-chipv">${fmt(spentM)}</div></div>
+    <div class="db-chip"><div class="db-chipl">Remaining</div><div class="db-chipv" style="color:${remCol}">${fmt(remM)}</div></div>
+  </div>
+  <div class="card">
+    <span class="db-cardeyebrow">Spending — ${MONTHS[m]}</span>
+    ${spendCats.length?spendCats.map(c=>{
+      const pct=c.budget>0?c.spent/c.budget:(c.spent>0?1.5:0);
+      const col=pct>=1?"var(--red)":(pct>=0.85?"var(--amber)":"var(--green)");
+      const wd=Math.max(0,Math.min(pct,1))*100;
+      return `<div class="db-prog"><div class="db-progtop"><span>${escapeHTML(c.name)}</span><span class="muted">${fmt(c.spent)} / ${fmt(c.budget)}</span></div><div class="db-track"><div class="db-fill" style="width:${wd}%;background:${col}"></div></div></div>`;
+    }).join(""):`<div class="empty">No spending or budgets for ${MONTHS[m]}</div>`}
+  </div>
+  <div class="card">
+    <span class="db-cardeyebrow">Assets</span>
+    ${assetRow("checking","Checking")}
+    ${assetRow("savings","Savings")}
+    ${assetRow("cardBalance","Card Balance")}
+    ${assetRow("other","Other")}
+    ${assetRow("cece529","Cece 529")}
+    <div class="kv"><span class="lbl">Stocks</span><span class="val">${fmt(stocks)}</span></div>
+    <div class="kv"><span class="lbl">Pending Charges</span><span class="val ${fmtCls(pend)}">${fmt(pend)}</span></div>
+    <div class="db-total"><span>Net worth</span><span>${fmt(netWorth)}</span></div>
+  </div>
+  <div class="card">
+    <h3>Debts <button class="btn sm" onclick="openDebtModal()">+ Add</button></h3>
+    ${debts.length?`<div class="tbl-wrap"><table>
+      <tr><th>Title</th><th class="num">Mo. Pmt</th><th class="num">Balance</th><th></th></tr>
+      ${debts.map(d=>`<tr><td>${escapeHTML(d.title)}</td><td class="num">${fmt(d.payment)}</td><td class="num">${fmt(d.balance)}</td>
+        <td style="text-align:right"><button class="icon-btn" onclick="openDebtModal('${d.id}')">${ICONS.edit}</button><button class="icon-btn" onclick="delItem('debts','${d.id}')">${ICONS.trash}</button></td></tr>`).join("")}
+      <tr class="total-row"><td>Total</td><td class="num">${fmt(debtPmt)}</td><td class="num">${fmt(debtBal)}</td><td></td></tr>
+    </table></div>`:`<div class="empty">No debts tracked</div>`}
+  </div>
+  <div class="card">
+    <h3>Subscriptions <button class="btn sm" onclick="openSubModal()">+ Add</button></h3>
+    <div class="sub-list">
+    ${subs.length?subs.map(s=>`<div class="kv"><span class="lbl">${escapeHTML(s.name)}</span>
+      <span style="display:flex;align-items:center;gap:4px"><span class="val">${fmt(s.amount)}</span>
+      <button class="icon-btn" onclick="openSubModal('${s.id}')">${ICONS.edit}</button><button class="icon-btn" onclick="delItem('subscriptions','${s.id}')">${ICONS.trash}</button></span></div>`).join(""):`<div class="empty">No subscriptions</div>`}
     </div>
-    <div class="card">
-      <h3>Debts <button class="btn sm" onclick="openDebtModal()">+ Add</button></h3>
-      ${debts.length?`<div class="tbl-wrap"><table>
-        <tr><th>Title</th><th class="num">Mo. Pmt</th><th class="num">Balance</th><th></th></tr>
-        ${debts.map(d=>`<tr><td>${escapeHTML(d.title)}</td><td class="num">${fmt(d.payment)}</td><td class="num">${fmt(d.balance)}</td>
-          <td style="text-align:right"><button class="icon-btn" onclick="openDebtModal('${d.id}')">${ICONS.edit}</button><button class="icon-btn" onclick="delItem('debts','${d.id}')">${ICONS.trash}</button></td></tr>`).join("")}
-        <tr class="total-row"><td>Total</td><td class="num">${fmt(debtPmt)}</td><td class="num">${fmt(debtBal)}</td><td></td></tr>
-      </table></div>`:`<div class="empty">No debts tracked</div>`}
-    </div>
-    <div class="card">
-      <h3>Subscription Tracker <button class="btn sm" onclick="openSubModal()">+ Add</button></h3>
-      <div class="sub-list">
-      ${subs.length?subs.map(s=>`<div class="kv"><span class="lbl">${escapeHTML(s.name)}</span>
-        <span style="display:flex;align-items:center;gap:4px"><span class="val">${fmt(s.amount)}</span>
-        <button class="icon-btn" onclick="openSubModal('${s.id}')">${ICONS.edit}</button><button class="icon-btn" onclick="delItem('subscriptions','${s.id}')">${ICONS.trash}</button></span></div>`).join(""):`<div class="empty">No subscriptions</div>`}
-      </div>
-      ${subs.length?`<div class="kv rule big"><span class="lbl">Total / month</span><span class="val">${fmt(subTotal)}</span></div>`:""}
+    ${subs.length?`<div class="kv rule big"><span class="lbl">Total / month</span><span class="val">${fmt(subTotal)}</span></div>`:""}
+  </div>
+  <div class="card">
+    <h3>Paycheck Calculators <button class="btn sm" onclick="openPayModal()">+ Add</button></h3>
+    <div class="grid grid-2" style="margin-bottom:0">
+    ${appData.paychecks.map(pp=>{
+      const wk=pp.rate*pp.hours;
+      return `<div>
+        <div class="kv"><span class="lbl" style="font-weight:700;color:var(--text)">${escapeHTML(pp.label)}</span>
+        <span><button class="icon-btn" onclick="openPayModal('${pp.id}')">${ICONS.edit}</button><button class="icon-btn" onclick="delItem('paychecks','${pp.id}')">${ICONS.trash}</button></span></div>
+        <div class="kv"><span class="lbl">Effective pay</span><input class="inline-num" value="${pp.rate}" onchange="setPay('${pp.id}','rate',this.value)"></div>
+        <div class="kv"><span class="lbl">Hours / week</span><input class="inline-num" value="${pp.hours}" onchange="setPay('${pp.id}','hours',this.value)"></div>
+        <div class="kv"><span class="lbl">Weekly Pay</span><span class="val">${fmt(wk)}</span></div>
+        <div class="kv"><span class="lbl">Per Pay Period</span><span class="val">${fmt(wk*2)}</span></div>
+        <div class="kv rule"><span class="lbl">Expected Mo.</span><span class="val">${fmt(wk*4)}</span></div>
+      </div>`;}).join("")}
     </div>
   </div>
-  <div class="grid grid-2">
-    <div class="card">
-      <h3>Paycheck Calculators <button class="btn sm" onclick="openPayModal()">+ Add</button></h3>
-      <div class="grid grid-2" style="margin-bottom:0">
-      ${appData.paychecks.map(p=>{
-        const wk=p.rate*p.hours;
-        return `<div>
-          <div class="kv"><span class="lbl" style="font-weight:700;color:var(--text)">${escapeHTML(p.label)}</span>
-          <span><button class="icon-btn" onclick="openPayModal('${p.id}')">${ICONS.edit}</button><button class="icon-btn" onclick="delItem('paychecks','${p.id}')">${ICONS.trash}</button></span></div>
-          <div class="kv"><span class="lbl">Effective pay</span><input class="inline-num" value="${p.rate}" onchange="setPay('${p.id}','rate',this.value)"></div>
-          <div class="kv"><span class="lbl">Hours / week</span><input class="inline-num" value="${p.hours}" onchange="setPay('${p.id}','hours',this.value)"></div>
-          <div class="kv"><span class="lbl">Weekly Pay</span><span class="val">${fmt(wk)}</span></div>
-          <div class="kv"><span class="lbl">Per Pay Period</span><span class="val">${fmt(wk*2)}</span></div>
-          <div class="kv rule"><span class="lbl">Expected Mo.</span><span class="val">${fmt(wk*4)}</span></div>
-        </div>`;}).join("")}
-      </div>
-    </div>
-    <div class="card">
-      <h3>Investments <span><button class="btn sm" id="refreshPricesBtn" onclick="refreshAllPrices()">${ICONS.refresh} Refresh prices</button> <button class="btn sm" onclick="openHoldingModal()">+ Add</button></span></h3>
-      ${renderHoldingsTable()}
-    </div>
+  <div class="card">
+    <h3>Investments <span><button class="btn sm" id="refreshPricesBtn" onclick="refreshAllPrices()">${ICONS.refresh} Refresh prices</button> <button class="btn sm" onclick="openHoldingModal()">+ Add</button></span></h3>
+    ${renderHoldingsTable()}
   </div>
   <div class="card">
     <h3>${MONTHS[m]} Budget vs Actual</h3>
     <div class="tbl-wrap">${renderBudgetVsActual(m)}</div>
-  </div>
-  <div class="grid grid-2">
-    <div class="card"><h3>${MONTHS[m]} Spending by Category</h3><div class="chart-box"><canvas id="spendChart"></canvas></div></div>
-    <div class="card"><h3>Budget vs Actual by Category</h3><div class="chart-box"><canvas id="bvaChart"></canvas></div></div>
   </div>`;
-  renderDashCharts(m);
 }
 function setAsset(k,v){appData.assets[k]=num(v);saveData();navigate();}
 function setPay(id,k,v){const p=appData.paychecks.find(x=>x.id===id);if(p){p[k]=num(v);saveData();navigate();}}
@@ -1015,6 +1067,7 @@ function renderSettings(host){
   <div class="grid grid-2">
     <div class="card">
       <h3>Appearance</h3>
+      <div class="kv"><span class="lbl">Your name</span><input value="${escapeHTML(appData.settings.name||'')}" onchange="setName(this.value)" placeholder="e.g. Ben" style="width:auto;text-align:right;color:var(--input-blue)"></div>
       <div class="kv"><span class="lbl">Theme</span>
         <select style="width:auto" onchange="setTheme(this.value)">
           <option value="light" ${appData.settings.theme==="light"?"selected":""}>Light</option>
