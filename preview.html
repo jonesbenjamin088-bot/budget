@@ -183,6 +183,17 @@ body{touch-action:manipulation} /* prevents double-tap zoom; no size change */
 .db-fill{height:100%;border-radius:99px}
 .db-total{display:flex;justify-content:space-between;align-items:center;background:#0e0e10;border-radius:11px;margin:12px -7px -6px;padding:11px 13px;font-weight:600;font-size:14px}
 .db-total span:last-child{font-weight:700}
+
+/* ===== Stage C monthly ===== */
+.tx-date{font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-soft);font-weight:600;margin:16px 0 6px}
+.tx-date:first-child{margin-top:2px}
+.tx-row{display:flex;align-items:center;gap:12px;padding:8px 0}
+.tx-mono{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;flex-shrink:0}
+.tx-mid{flex:1;min-width:0}
+.tx-name{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx-cat{font-size:12px;color:var(--text-soft);margin-top:1px}
+.tx-amt{font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tx-act{display:flex;gap:2px;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -788,13 +799,24 @@ function setBudget(catId,monthIdx,v){
 function setCurMonth(i){curMonth=i;navigate();}
 function renderMonths(host){
   const m=curMonth;
-  const txs=txsFor(m).slice().sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  const txs=txsFor(m).slice().sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+  const budget=totalBudgetExpenses(m), act=totalActualExpenses(m), left=budget-act;
+  const leftCol=left<0?"var(--red)":"var(--green)";
+  const groups={}, order=[];
+  txs.forEach(t=>{const d=t.date||"";if(!(d in groups)){groups[d]=[];order.push(d);}groups[d].push(t);});
+  const MONO=["#6366f1","#30d158","#ff9f0a","#ff453a","#5e5ce6","#64d2ff","#ffd60a","#bf5af2","#ac8e68"];
+  const monoColor=str=>{let h=0;for(let i=0;i<str.length;i++)h=(h*31+str.charCodeAt(i))>>>0;return MONO[h%MONO.length];};
+  const pad=x=>String(x).padStart(2,"0");
+  const now=new Date();
+  const td=now.getFullYear()+"-"+pad(now.getMonth()+1)+"-"+pad(now.getDate());
+  const yo=new Date(now.getFullYear(),now.getMonth(),now.getDate()-1);
+  const yd=yo.getFullYear()+"-"+pad(yo.getMonth()+1)+"-"+pad(yo.getDate());
+  const dateLabel=d=>{if(!d)return "No date";if(d===td)return "Today";if(d===yd)return "Yesterday";const pr=d.split("-");return MONTHS[parseInt(pr[1],10)-1]+" "+parseInt(pr[2],10);};
   const weeks=["Week 1","Week 2","Week 3","Week 4"];
   const weeklyRow=c=>{
     const w=weeks.map(wk=>actualWeek(c.id,m,wk));
     const tot=w.reduce((s,v)=>s+v,0), b=budgetOf(c.id,m);
-    const pct=b?tot/b:null;
-    const over=pct!=null&&pct>1;
+    const pct=b?tot/b:null; const over=pct!=null&&pct>1;
     return `<tr><td>${escapeHTML(c.name)}</td>
       ${w.map(v=>`<td class="num">${v?fmt(v):'<span class="muted">–</span>'}</td>`).join("")}
       <td class="num"><b>${fmt(tot)}</b></td><td class="num">${fmt(b)}</td>
@@ -802,30 +824,33 @@ function renderMonths(host){
       <td><div class="bar"><i class="${over?'over':''}" style="width:${pct==null?0:Math.min(100,pct*100)}%"></i></div></td></tr>`;
   };
   host.innerHTML=`
-  <div class="page-head">
-    <div><h1 class="page-title">${MONTHS[m]} ${appData.year}</h1><div class="page-sub">${txs.length} transaction${txs.length===1?"":"s"}</div></div>
-    <div class="head-actions">
-      <button class="btn" onclick="openCSVModal()">Import CSV</button>
-      <button class="btn primary" onclick="openTxModal()">+ Add Transaction</button>
-    </div>
+  <div class="db-head">
+    <div><div class="db-greet">Monthly</div><div class="page-sub">${MONTHS[m]} ${appData.year} · ${txs.length} transaction${txs.length===1?"":"s"}</div></div>
+    <button class="btn primary" onclick="openTxModal()">+ Add</button>
   </div>
-  ${monthTabsHTML(m,"setCurMonth")}
-  <div style="height:14px"></div>
+  <div class="head-actions" style="margin-bottom:16px">${monthTabsHTML(m,"setCurMonth")}</div>
+  <div class="db-chips">
+    <div class="db-chip"><div class="db-chipl">Budget</div><div class="db-chipv">${fmt(budget)}</div></div>
+    <div class="db-chip"><div class="db-chipl">Actual</div><div class="db-chipv">${fmt(act)}</div></div>
+    <div class="db-chip"><div class="db-chipl">Left</div><div class="db-chipv" style="color:${leftCol}">${fmt(left)}</div></div>
+  </div>
   <div class="card">
-    <h3>Transactions</h3>
-    ${txs.length?`<div class="tbl-wrap"><table>
-      <tr><th>Week</th><th>Category</th><th>Account</th><th>Name</th><th>Date</th><th class="num">$ Spend</th><th>Notes</th><th></th></tr>
-      ${txs.map(t=>`<tr>
-        <td class="muted">${weekOf(t.date)}</td>
-        <td>${escapeHTML(catName(t.catId))}</td>
-        <td>${escapeHTML(t.account||"")}</td>
-        <td>${escapeHTML(t.name)}</td>
-        <td>${t.date||""}</td>
-        <td class="num">${fmt(t.amount)}</td>
-        <td class="muted">${String(t.notes||"").trim().toLowerCase()==="pending"?'<span class="pill amber">Pending</span>':escapeHTML(t.notes||"")}</td>
-        <td style="text-align:right"><button class="icon-btn" onclick="openTxModal('${t.id}')">${ICONS.edit}</button><button class="icon-btn" onclick="delTx('${t.id}')">${ICONS.trash}</button></td>
-      </tr>`).join("")}
-    </table></div>`:`<div class="empty">No transactions in ${MONTHS[m]} yet — add one or import a CSV</div>`}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span class="db-cardeyebrow" style="margin-bottom:0">Transactions</span><button class="btn sm" onclick="openCSVModal()">Import CSV</button></div>
+    ${txs.length?order.map(d=>`
+      <div class="tx-date">${dateLabel(d)}</div>
+      ${groups[d].map(t=>{
+        const cat=catById(t.catId); const isIncome=cat&&cat.group==="income";
+        const col=monoColor(t.name||"?");
+        const sign=isIncome?"+":"-";
+        const pend=String(t.notes||"").trim().toLowerCase()==="pending";
+        return `<div class="tx-row">
+          <div class="tx-mono" style="background:${col}22;color:${col}">${escapeHTML((t.name||"?").trim().charAt(0).toUpperCase())}</div>
+          <div class="tx-mid"><div class="tx-name">${escapeHTML(t.name||"")}</div><div class="tx-cat">${escapeHTML(cat?cat.name:"(deleted)")}${pend?' · <span style="color:var(--amber)">Pending</span>':""}</div></div>
+          <div class="tx-amt" style="color:${isIncome?'var(--green)':'var(--text)'}">${sign}${fmt(t.amount)}</div>
+          <div class="tx-act"><button class="icon-btn" onclick="openTxModal('${t.id}')">${ICONS.edit}</button><button class="icon-btn" onclick="delTx('${t.id}')">${ICONS.trash}</button></div>
+        </div>`;
+      }).join("")}
+    `).join(""):`<div class="empty">No transactions in ${MONTHS[m]} yet — add one or import a CSV</div>`}
   </div>
   <div class="card">
     <h3>Actual Spend by Week</h3>
