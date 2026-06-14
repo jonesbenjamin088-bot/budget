@@ -138,6 +138,8 @@ input.grid-num:focus{border-color:var(--accent);background:var(--surface)}
 .auth-wrap{position:fixed;inset:0;background:var(--bg);z-index:90;display:flex;align-items:center;justify-content:center;padding:18px}
 .auth-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);width:100%;max-width:370px;padding:24px}
 @media print{.sidebar,.topbar,.head-actions{display:none}.main{margin:0}}
+
+body{touch-action:manipulation} /* prevents double-tap zoom; no size change */
 </style>
 </head>
 <body>
@@ -514,7 +516,7 @@ function renderBudgetVsActual(m){
       <td class="num muted">${tAE?fmtPct(act/tAE):"–"}</td><td class="num">${fmt(act)}</td>
       <td class="num ${v<0?'neg':'pos'}">${fmt(v)}</td></tr>`;
   };
-  let html=`<table>
+  let html=`<div class="tbl-wrap"><table>
     <tr><th>Category</th><th class="num">% Budget</th><th class="num">Budget</th><th class="num">% Actual</th><th class="num">Actual</th><th class="num">Variance</th></tr>
     <tr class="section-row"><td colspan="6">Income</td></tr>
     ${catsIn("income").map(c=>{
@@ -528,7 +530,7 @@ function renderBudgetVsActual(m){
     ${catsIn("variable").map(row).join("")}
     <tr class="total-row"><td>Total Monthly Expenses</td><td></td><td class="num">${fmt(tBE)}</td><td></td><td class="num">${fmt(tAE)}</td><td class="num ${tBE-tAE<0?'neg':'pos'}">${fmt(tBE-tAE)}</td></tr>
     <tr class="total-row"><td>Income − Expense</td><td></td><td class="num ${fmtCls(totalBudgetIncome(m)-tBE)}">${fmt(totalBudgetIncome(m)-tBE)}</td><td></td><td class="num ${fmtCls(totalActualIncome(m)-tAE)}">${fmt(totalActualIncome(m)-tAE)}</td><td></td></tr>
-  </table>`;
+  </table></div>`;
   return html;
 }
 function chartPalette(n){
@@ -900,7 +902,7 @@ function renderCategories(host){
     const list=catsIn(g);
     return `<div class="card">
       <h3>${label} <button class="btn sm" onclick="openCatModal('','${g}')">+ Add</button></h3>
-      ${list.length?`<table>${list.map((c,i)=>{
+      ${list.length?`<div class="tbl-wrap"><table>${list.map((c,i)=>{
         const txCount=appData.transactions.filter(t=>t.catId===c.id).length;
         return `<tr><td>${escapeHTML(c.name)} ${txCount?`<span class="muted">· ${txCount} txns</span>`:""}</td>
           <td style="text-align:right;white-space:nowrap">
@@ -908,7 +910,7 @@ function renderCategories(host){
             <button class="icon-btn" ${i===list.length-1?"disabled":""} onclick="moveCat('${c.id}',1)">${ICONS.down}</button>
             <button class="icon-btn" onclick="openCatModal('${c.id}')">${ICONS.edit}</button>
             <button class="icon-btn" onclick="deleteCat('${c.id}')">${ICONS.trash}</button>
-          </td></tr>`;}).join("")}</table>`:`<div class="empty">None</div>`}
+          </td></tr>`;}).join("")}</table></div>`:`<div class="empty">None</div>`}
     </div>`;
   };
   host.innerHTML=`
@@ -1083,5 +1085,6 @@ function init(){
 }
 init();
 </script>
+<script>document.addEventListener("gesturestart",function(e){e.preventDefault();},{passive:false});</script>
 </body>
 </html>
