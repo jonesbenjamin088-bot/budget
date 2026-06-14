@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>2026 Budget</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -138,15 +138,6 @@ input.grid-num:focus{border-color:var(--accent);background:var(--surface)}
 .auth-wrap{position:fixed;inset:0;background:var(--bg);z-index:90;display:flex;align-items:center;justify-content:center;padding:18px}
 .auth-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);width:100%;max-width:370px;padding:24px}
 @media print{.sidebar,.topbar,.head-actions{display:none}.main{margin:0}}
-
-/* ===== iphone-fit: mobile layout + zoom lock (added) ===== */
-html{-webkit-text-size-adjust:100%}
-body{touch-action:manipulation}
-img,canvas{max-width:100%}
-@media(max-width:760px){
-  table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
-  input,select,textarea,input.inline-num,input.grid-num{font-size:16px}
-}
 </style>
 </head>
 <body>
@@ -1092,6 +1083,5 @@ function init(){
 }
 init();
 </script>
-<script>/* iphone-fit */document.addEventListener("gesturestart",function(e){e.preventDefault();},{passive:false});</script>
 </body>
 </html>
